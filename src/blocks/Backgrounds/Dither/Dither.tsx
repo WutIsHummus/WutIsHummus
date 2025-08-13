@@ -1,6 +1,4 @@
-/*
-  Installed from https://reactbits.dev/ts/default/
-*/
+
 
 /* eslint-disable react/no-unknown-property */
 import { useRef, useState, useEffect } from "react";
@@ -8,7 +6,7 @@ import { Canvas, useFrame, useThree, ThreeEvent } from "@react-three/fiber";
 import { EffectComposer, wrapEffect } from "@react-three/postprocessing";
 import { Effect } from "postprocessing";
 import * as THREE from "three";
-import { Mesh } from 'three'
+import { Mesh, MathUtils } from 'three'
 
 import "./Dither.css";
 const MAX_BLOBS = 20;
@@ -36,6 +34,7 @@ uniform float waveSpeed;
 uniform float waveFrequency;
 uniform float waveAmplitude;
 uniform vec3  waveColor;
+uniform int uOctaves;
 uniform vec2  mousePos;
 uniform int   enableMouseInteraction;
 uniform float mouseRadius;
@@ -77,10 +76,10 @@ float cnoise(vec2 P){
   return 2.3 * mix(nx.x, nx.y, fxy.y);
 }
 
-const int OCTAVES = 8;
 float fbm(vec2 p){
   float v = 0.0, a = 1.0;
-  for(int i=0; i<OCTAVES; i++){
+  for(int i = 0; i < 8; i++){
+    if(i >= uOctaves) break;
     v += a * abs(cnoise(p));
     p *= waveFrequency;
     a *= waveAmplitude;
@@ -103,18 +102,24 @@ void main(){
   float mask = 0.0;
   if(uBlobsActive == 1){
     float edge = 0.05;
-    float eps  = 1e-4;
     float grow = clamp((time - uStartTime) / uGrowDuration, 0.0, 1.0);
-    for(int i=0; i<20; i++){
-      if(i>=numBlobs) break;
+
+    for(int i = 0; i < numBlobs; ++i) {
       vec4 B = blobs[i];
-      float rnd = fract(sin(float(i)*12.9898)*43758.5453);
-      float rx = max(B.z * grow, eps);
-      float ry = max(B.w * grow, eps);
+      float rx = max(B.z * grow, 1e-4);
+      float ry = max(B.w * grow, 1e-4);
+
       vec2 dpos = uv - B.xy;
+      float d = length(vec2(dpos.x / rx, dpos.y / ry));
+
+      // quick reject if we’re well outside the noisy band
+      if (d > 1.0 + waveAmplitude + edge) continue;
+
+      // only now do the noise
+      float rnd = fract(sin(float(i)*12.9898)*43758.5453);
       float w = pattern(dpos * waveFrequency + (time + rnd*10.0)*waveSpeed)
               * waveAmplitude;
-      float d = length(vec2(dpos.x/rx,dpos.y/ry));
+
       float thresh = 1.0 + w;
       float m = 1.0 - smoothstep(thresh - edge, thresh + edge, d);
       mask = max(mask, m);
@@ -233,8 +238,8 @@ function DitheredWaves({
 }) {
   const mesh = useRef<Mesh | null>(null)
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
-  const [startTime, setStartTime] = useState(0);
   const { viewport, size, gl } = useThree();
+  const startTimeRef = useRef(0);
 
   useEffect(() => {
     if (mesh.current) {
@@ -243,11 +248,6 @@ function DitheredWaves({
   }, [viewport.width, viewport.height]);
 
 
-  useEffect(() => {
-    if (blobsActive) {
-      setStartTime(performance.now() / 1000);
-    }
-  }, [blobsActive]);
 
   const waveUniformsRef = useRef({
     time: new THREE.Uniform(0),
@@ -258,6 +258,7 @@ function DitheredWaves({
     waveColor: new THREE.Uniform(new THREE.Color(...waveColor)),
     mousePos: new THREE.Uniform(new THREE.Vector2(0, 0)),
     uBlobsActive: new THREE.Uniform(0),
+    uOctaves: new THREE.Uniform(8),
     enableMouseInteraction: new THREE.Uniform(enableMouseInteraction ? 1 : 0),
     mouseRadius: new THREE.Uniform(mouseRadius),
     uGrowDuration: new THREE.Uniform(2.0),
@@ -302,19 +303,32 @@ function DitheredWaves({
   }, [size, gl]);
 
   useFrame(({ clock }) => {
+
+     const elapsedTime = clock.getElapsedTime();
+
     if (!disableAnimation) {
-      waveUniformsRef.current.time.value = clock.getElapsedTime();
+      waveUniformsRef.current.time.value = elapsedTime;
     }
+
+
+     if (blobsActive && startTimeRef.current === 0) {
+    startTimeRef.current = elapsedTime;
+  } else if (!blobsActive) {
+    startTimeRef.current = 0;
+  }
+
+
     waveUniformsRef.current.waveSpeed.value = waveSpeed;
     waveUniformsRef.current.waveFrequency.value = waveFrequency;
     waveUniformsRef.current.waveAmplitude.value = waveAmplitude;
     waveUniformsRef.current.waveColor.value.set(...waveColor);
     waveUniformsRef.current.enableMouseInteraction.value =
       enableMouseInteraction ? 1 : 0;
+
     waveUniformsRef.current.uBlobsActive.value = blobsActive ? 1 : 0;
     waveUniformsRef.current.mouseRadius.value = mouseRadius;
-    waveUniformsRef.current.uGrowDuration.value = 1.0;
-    waveUniformsRef.current.uStartTime.value = startTime;
+    waveUniformsRef.current.uGrowDuration.value = 1;
+    waveUniformsRef.current.uStartTime.value = startTimeRef.current;
     if (enableMouseInteraction) {
       waveUniformsRef.current.mousePos.value.set(mousePos.x, mousePos.y);
     }
@@ -360,6 +374,7 @@ interface BlobConfig {
   cy: number;
   rx: number;
   ry: number;
+  label: string;
 }
 
 interface DitherProps {

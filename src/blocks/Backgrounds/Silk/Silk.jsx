@@ -104,6 +104,7 @@ const Silk = ({
   color = "#7B7481",
   noiseIntensity = 1.5,
   rotation = 0,
+  className = "",
 }) => {
   const meshRef = useRef();
 
@@ -120,7 +121,7 @@ const Silk = ({
   );
 
   return (
-    <Canvas dpr={[1, 2]} frameloop="always">
+    <Canvas className={className} dpr={[1, 2]} frameloop="always">
       <SilkPlane ref={meshRef} uniforms={uniforms} />
     </Canvas>
   );

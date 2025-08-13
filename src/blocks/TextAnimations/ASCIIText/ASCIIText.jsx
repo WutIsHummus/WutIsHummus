@@ -221,6 +221,8 @@ class CanvAscii {
       textColor,
       planeBaseHeight,
       enableWaves,
+      followMouse,
+      rotationLimit,
     },
     containerElem,
     width,
@@ -235,6 +237,10 @@ class CanvAscii {
     this.width = width;
     this.height = height;
     this.enableWaves = enableWaves;
+    this.followMouse = followMouse;
+    this.rotationLimit = rotationLimit;
+
+    this.mouse = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
 
     this.camera = new THREE.PerspectiveCamera(
       60,
@@ -245,7 +251,6 @@ class CanvAscii {
     this.camera.position.z = 35;
 
     this.scene = new THREE.Scene();
-    this.mouse = { x: 0, y: 0 };
 
     this.onMouseMove = this.onMouseMove.bind(this);
 
@@ -305,8 +310,10 @@ class CanvAscii {
     this.container.appendChild(this.filter.domElement);
     this.setSize(this.width, this.height);
 
-    window.addEventListener("mousemove", this.onMouseMove);
-    window.addEventListener("touchmove", this.onMouseMove);
+    if (this.followMouse) {
+      window.addEventListener("mousemove", this.onMouseMove);
+      window.addEventListener("touchmove", this.onMouseMove);
+    }
   }
 
   setSize(w, h) {
@@ -366,11 +373,21 @@ class CanvAscii {
   updateRotation() {
     const winW = window.innerWidth;
     const winH = window.innerHeight;
-    const tiltRange = 0.2;
-    const x = Math.map(this.mouse.y, 0, winH, tiltRange, -tiltRange);
-    const y = Math.map(this.mouse.x, 0, winW, -tiltRange, tiltRange);
-    this.mesh.rotation.x += (x - this.mesh.rotation.x) * 0.05;
-    this.mesh.rotation.y += (y - this.mesh.rotation.y) * 0.05;
+    const tiltRange = this.rotationLimit;
+    let targetX, targetY;
+
+    if (this.followMouse) {
+      targetX = Math.map(this.mouse.y, 0, winH, tiltRange, -tiltRange);
+      targetY = Math.map(this.mouse.x, 0, winW, -tiltRange, tiltRange);
+    } else {
+      const time = performance.now() * 0.0001;
+      targetX = Math.cos(time * 0.7 + Math.PI / 2.0) * tiltRange;
+      targetY = Math.cos(time * 0.5 + Math.PI / 2.0) * tiltRange;
+    }
+
+    // Smoothly interpolate to the target rotation
+    this.mesh.rotation.x += (targetX - this.mesh.rotation.x) * 0.05;
+    this.mesh.rotation.y += (targetY - this.mesh.rotation.y) * 0.05;
   }
 
   clear() {
@@ -401,8 +418,12 @@ class CanvAscii {
     cancelAnimationFrame(this.animationFrameId);
     this.filter.dispose();
     this.container.removeChild(this.filter.domElement);
-    window.removeEventListener("mousemove", this.onMouseMove);
-    window.removeEventListener("touchmove", this.onMouseMove);
+
+    if (this.followMouse) {
+      window.removeEventListener("mousemove", this.onMouseMove);
+      window.removeEventListener("touchmove", this.onMouseMove);
+    }
+
     this.clear();
     this.renderer.dispose();
   }
@@ -417,6 +438,8 @@ export default function ASCIIText({
   enableWaves = true,
   className = "",
   style = {},
+  followMouse = true,
+  rotationLimit = 0.2,
 }) {
   const containerRef = useRef(null);
   const asciiInstance = useRef(null);
@@ -429,7 +452,7 @@ export default function ASCIIText({
       const { width, height } = container.getBoundingClientRect();
       if (width > 0 && height > 0) {
         asciiInstance.current = new CanvAscii(
-          { text, asciiFontSize, textFontSize, textColor, planeBaseHeight, enableWaves },
+          { text, asciiFontSize, textFontSize, textColor, planeBaseHeight, enableWaves, followMouse, rotationLimit },
           container,
           width,
           height
@@ -451,7 +474,7 @@ export default function ASCIIText({
       ro.disconnect();
       asciiInstance.current?.dispose();
     };
-  }, [text, asciiFontSize, textFontSize, textColor, planeBaseHeight, enableWaves]);
+  }, [text, asciiFontSize, textFontSize, textColor, planeBaseHeight, enableWaves, followMouse, rotationLimit]);
 
   return (
     <div
