@@ -6,7 +6,7 @@ import MainMenu from "./Parts/mainmenu";
 
 const mainMenuBlobs = [
   { cx: -0.2, cy: 0.15, rx: 0.099, ry: 0.037, label: "Tech Stack" },
-  { cx: -0.3, cy: 0.05, rx: 0.1, ry: 0.037, label: "Featured Projects" },
+  { cx: -0.3, cy: 0.05, rx: 0.1, ry: 0.037, label: "Projects" },
   { cx: -0.3, cy: -0.05, rx: 0.1, ry: 0.037, label: "Experiences" },
   { cx: -0.2, cy: -0.15, rx: 0.099, ry: 0.037, label: "About Me" },
   { cx: 0.2, cy: 0, rx: 0.17, ry: 0.17, label: "" },

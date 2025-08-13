@@ -1,6 +1,8 @@
 import React, { useEffect } from "react";
 import { useRef } from "react";
 import * as THREE from "three";
+const DEFAULT_FONT_STACK =
+  `"Times New Roman", Times, "Liberation Serif", "Nimbus Roman No9 L", serif`;
 
 const vertexShader = `
 varying vec2 vUv;
@@ -162,7 +164,7 @@ class AsciiFilter {
 class CanvasTxt {
   constructor(
     txt,
-    { fontSize = 200, fontFamily = "Arial", color = "#fdf9f3" } = {},
+    { fontSize = 200, fontFamily = DEFAULT_FONT_STACK, color = "#fdf9f3" } = {},
   ) {
     this.canvas = document.createElement("canvas");
     this.context = this.canvas.getContext("2d");
@@ -212,6 +214,8 @@ class CanvasTxt {
   }
 }
 
+
+
 class CanvAscii {
   constructor(
     {
@@ -223,6 +227,10 @@ class CanvAscii {
       enableWaves,
       followMouse,
       rotationLimit,
+      fontFamily,
+      overlayFontFamily,
+      fitToView,
+      fitPadding,
     },
     containerElem,
     width,
@@ -239,6 +247,10 @@ class CanvAscii {
     this.enableWaves = enableWaves;
     this.followMouse = followMouse;
     this.rotationLimit = rotationLimit;
+    this.fontFamily = fontFamily;
+    this.overlayFontFamily = overlayFontFamily;
+    this.fitToView = fitToView;
+    this.fitPadding = fitPadding ?? 0.8;
 
     this.mouse = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
 
@@ -258,10 +270,27 @@ class CanvAscii {
     this.setRenderer();
   }
 
+  fitMeshToView() {
+    if (!this.mesh) return;
+
+    const visibleH = 2 * this.camera.position.z * Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2));
+    const visibleW = visibleH * (this.width / this.height);
+
+    const planeH = this.planeBaseHeight;
+    const planeW = this.planeBaseHeight * (this.textCanvas.width / this.textCanvas.height);
+
+    const sH = (visibleH * this.fitPadding) / planeH;
+    const sW = (visibleW * this.fitPadding) / planeW;
+    const scale = this.fitToView ? Math.min(sH, sW) : 1;
+
+    this.mesh.scale.set(scale, scale, 1);
+  }
+
+
   setMesh() {
     this.textCanvas = new CanvasTxt(this.textString, {
       fontSize: this.textFontSize,
-      fontFamily: "IBM Plex Mono",
+      fontFamily: this.fontFamily || DEFAULT_FONT_STACK,
       color: this.textColor,
     });
     this.textCanvas.resize();
@@ -293,6 +322,7 @@ class CanvAscii {
 
     this.mesh = new THREE.Mesh(this.geometry, this.material);
     this.scene.add(this.mesh);
+    this.fitMeshToView();
   }
 
   setRenderer() {
@@ -302,13 +332,14 @@ class CanvAscii {
     this.renderer.setViewport(0, 0, this.width, this.height);
 
     this.filter = new AsciiFilter(this.renderer, {
-      fontFamily: "IBM Plex Mono",
+      fontFamily: this.overlayFontFamily || this.fontFamily || DEFAULT_FONT_STACK,
       fontSize: this.asciiFontSize,
       invert: true,
     });
 
     this.container.appendChild(this.filter.domElement);
     this.setSize(this.width, this.height);
+    this.fitMeshToView();
 
     if (this.followMouse) {
       window.addEventListener("mousemove", this.onMouseMove);
@@ -440,6 +471,10 @@ export default function ASCIIText({
   style = {},
   followMouse = true,
   rotationLimit = 0.2,
+  fontFamily = DEFAULT_FONT_STACK,
+  overlayFontFamily,
+  fitToView = true,
+  fitPadding = 0.8,
 }) {
   const containerRef = useRef(null);
   const asciiInstance = useRef(null);
@@ -452,7 +487,11 @@ export default function ASCIIText({
       const { width, height } = container.getBoundingClientRect();
       if (width > 0 && height > 0) {
         asciiInstance.current = new CanvAscii(
-          { text, asciiFontSize, textFontSize, textColor, planeBaseHeight, enableWaves, followMouse, rotationLimit },
+          {
+            text, asciiFontSize, textFontSize, textColor, planeBaseHeight,
+            enableWaves, followMouse, rotationLimit, fontFamily,
+            overlayFontFamily: overlayFontFamily ?? fontFamily, fitToView, fitPadding
+          },
           container,
           width,
           height
@@ -474,7 +513,7 @@ export default function ASCIIText({
       ro.disconnect();
       asciiInstance.current?.dispose();
     };
-  }, [text, asciiFontSize, textFontSize, textColor, planeBaseHeight, enableWaves, followMouse, rotationLimit]);
+  }, [text, asciiFontSize, textFontSize, textColor, planeBaseHeight, enableWaves, followMouse, rotationLimit, fontFamily, overlayFontFamily]);
 
   return (
     <div

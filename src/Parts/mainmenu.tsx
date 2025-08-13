@@ -1,5 +1,6 @@
 import React, { useRef, useEffect, useState } from "react";
 import FuzzyText from "../blocks/TextAnimations/FuzzyText/FuzzyText";
+import ASCIIText from "../blocks/TextAnimations/ASCIIText/ASCIIText";
 
 interface Blob {
   cx: number;
@@ -85,16 +86,18 @@ export default function MainMenu({ isVisible, menuBlobs }: MainMenuProps) {
               }}
             >
               <div className="absolute inset-0 flex items-center justify-center hover:cursor-pointer">
-                <FuzzyText
-                  baseIntensity={0.1}
-                  hoverIntensity={0.2}
-                  color="#dc3f2aff"
-                  strokeColor="#151515"
-                  strokeWidth={6}
-                  fontSize={fontSize}
-                >
-                  {b.label}
-                </FuzzyText>
+                <ASCIIText
+                  text={b.label}
+                  fontFamily={`"Rubik Mono One", system-ui, sans-serif`}
+                  overlayFontFamily={`"IBM Plex Mono", ui-monospace, monospace`}
+                  asciiFontSize={1}
+                  planeBaseHeight={8}
+                  enableWaves={false}
+                  followMouse={false}
+                  textFontSize={120} 
+                  rotationLimit={0.02}
+                  fitPadding={0.9}
+                />
               </div>
 
             </div>
