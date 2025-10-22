@@ -27,27 +27,27 @@ export default function Initalheader({ disintegrateRef, onArrowClick }) {
       <Disintegrate ref={disintegrateRef} onDisintegrated={onArrowClick}>
         <div className={`transition-all duration-1000 ${showContent ? "opacity-100 " : "opacity-0 "} z-30`}>
           <div className="flex flex-col items-center justify-center gap-4">
-            <div className="w-full max-w-3xl h-[20vh]">
+            <div className="w-full max-w-5xl h-[30vh]">
               <ASCIIText
                 text="Alpeeenn"
                 enableWaves={true}
-                asciiFontSize={3}
-                planeBaseHeight={23}
+                asciiFontSize={4}
+                planeBaseHeight={30}
               />
             </div>
             <div
-              className="w-full max-w-2xl"
-              style={{ minHeight: fontSize * 1.35, textAlign: "center" }}
+              className="w-full flex justify-center"
+              style={{ minHeight: fontSize * 1.35 }}
             >
               <FuzzyText
                 baseIntensity={0.1}
                 hoverIntensity={0.2}
-                color="#ba3f30"
+                color="#e663e6ff"
                 strokeColor="#151515"
                 strokeWidth={6}
                 fontSize={fontSize}
               >
-                CS @ UT | FullStack @ LM | Roblox Dev
+                CS @ UT | FullStack @ LM | Roblox Dev | VCAT @ Long Horn Racing
               </FuzzyText>
             </div>
           </div>

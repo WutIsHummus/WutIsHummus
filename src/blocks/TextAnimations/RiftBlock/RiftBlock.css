@@ -1,0 +1,43 @@
+@import url('https://fonts.googleapis.com/css2?family=Love+Ya+Like+A+Sister&display=swap');
+.rift-block-text {
+  /* Font: Love Ya Like A Sister for a playful, cursive look */
+    font-family: "Love Ya Like A Sister", cursive;
+  font-weight: 400;         /* this font has a single weight */
+  letter-spacing: 0.06em;   /* slightly wider to match website labels */
+  font-stretch: normal;
+  font-variant-ligatures: none; /* avoids odd ligature pixels with filters */
+
+  /* Keep your existing rules below (tweak a few for crispness) */
+  text-transform: uppercase;
+  line-height: 1;
+  white-space: nowrap;
+
+  position: relative;
+  z-index: 1;
+  text-align: center;
+  display: block;
+  margin: 0 auto;
+
+  transition: filter 200ms ease, transform 300ms ease;
+
+  text-rendering: geometricPrecision;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+
+  padding: 0;
+  max-width: 90%;
+  overflow: visible;
+
+  transform: translateZ(0);
+  will-change: filter, transform;
+}
+
+/* If the horizontal “stencil bridge” line contributes to dots, disable it: */
+.rift-block-text::after {
+  display: none; /* comment this out to test quickly */
+}
+
+/* Also try removing the blurred duplicate if it’s causing grain: */
+.rift-block-text::before {
+  display: none; /* comment this out to test quickly */
+}

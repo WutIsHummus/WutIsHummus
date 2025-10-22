@@ -34,23 +34,106 @@ varying vec2 vUv;
 uniform float mouse;
 uniform float uTime;
 uniform sampler2D uTexture;
+uniform float uStyleMode; // 0.0 = subtle, 1.0 = creative blob style
 
 void main() {
     float time = uTime;
     vec2 pos = vUv;
     
     float move = sin(time + mouse) * 0.01;
-    float r = texture2D(uTexture, pos + cos(time * 2. - time + pos.x) * .01).r;
-    float g = texture2D(uTexture, pos + tan(time * .5 + pos.x - time) * .01).g;
-    float b = texture2D(uTexture, pos - cos(time * 2. + time + pos.y) * .01).b;
-    float a = texture2D(uTexture, pos).a;
-    gl_FragColor = vec4(r, g, b, a);
-}
-`;
+    vec4 baseSample = texture2D(uTexture, pos);
+    float intensity = baseSample.r;
 
-Math.map = function (n, start, stop, start2, stop2) {
+    // Enhanced chromatic aberration with varying offsets - STRONGER
+    float aberrationStrength = mix(0.01, 0.045, uStyleMode);
+    float r = texture2D(uTexture, pos + cos(time * 2. - time + pos.x) * aberrationStrength).r;
+    float g = texture2D(uTexture, pos + tan(time * .5 + pos.x - time) * aberrationStrength).g;
+    float b = texture2D(uTexture, pos - cos(time * 2. + time + pos.y) * aberrationStrength).b;
+
+    vec3 baseWhite = vec3(intensity);
+    vec3 chroma = vec3(r, g, b);
+
+    if (uStyleMode > 0.5) {
+        // Creative big blob style: STRONGER color blending with HIGH CONTRAST
+        vec2 centered = pos - 0.5;
+        float dist = length(centered);
+        float angle = atan(centered.y, centered.x);
+        
+        // Enhanced contrast on intensity
+        float enhancedIntensity = pow(intensity, 0.75); // boost mid-tones
+        float contrastBoost = smoothstep(0.2, 0.8, enhancedIntensity);
+        
+        // Animated radial gradient - stronger
+        float radialGrad = smoothstep(0.7, 0.0, dist);
+        float spiralPattern = sin(angle * 4.0 + time * 0.5 + dist * 12.0) * 0.5 + 0.5;
+        
+        // Multi-color gradient blend - MORE VIVID
+        vec3 color1 = vec3(0.75, 0.85, 1.0);      // cooler blue-white
+        vec3 color2 = vec3(1.0, 0.7, 0.9);        // stronger pink
+        vec3 color3 = vec3(0.65, 1.0, 0.95);      // vivid cyan
+        
+        float colorPhase = fract(time * 0.25 + pos.x * 0.8);
+        vec3 gradientColor = mix(color1, color2, colorPhase);
+        gradientColor = mix(gradientColor, color3, spiralPattern * 0.6);
+        
+        // STRONGER edge glow with chromatic separation
+        float edgeGlow = smoothstep(0.75, 0.15, enhancedIntensity) * (1.0 - enhancedIntensity);
+        vec3 glowChroma = vec3(r * 1.5, g * 1.4, b * 1.6);
+        
+        // Combine with STRONGER blending
+        vec3 styledColor = mix(baseWhite, gradientColor, 0.35 + radialGrad * 0.45);
+        styledColor = mix(styledColor, chroma, 0.5 + enhancedIntensity * 0.25);
+        styledColor = mix(styledColor, glowChroma, edgeGlow * 0.75);
+        
+        // HIGH CONTRAST saturation mapping
+        float saturation = mix(0.5, 1.0, 1.0 - contrastBoost);
+        vec3 finalColor = mix(styledColor, baseWhite * 1.1, 1.0 - saturation);
+        
+        // Add brightness boost with contrast
+        float brightnessMod = 0.85 + contrastBoost * 0.35;
+        
+        gl_FragColor = vec4(finalColor * brightnessMod, baseSample.a);
+    } else {
+        // Subtle style (original header look)
+        float colorMix = mix(0.12, 0.32, clamp(1.0 - intensity, 0.0, 1.0));
+        vec3 hinted = mix(baseWhite, chroma, colorMix);
+
+        float halo = smoothstep(0.65, 0.15, intensity);
+        vec3 haloColor = mix(hinted, vec3(0.88, 1.0, 0.95), halo * 0.6);
+
+        gl_FragColor = vec4(haloColor, baseSample.a);
+    }
+}
+`;Math.map = function (n, start, stop, start2, stop2) {
   return ((n - start) / (stop - start)) * (stop2 - start2) + start2;
 };
+
+// Roughly average character width = 0.6em for uppercase; tune as needed
+const CHAR_WIDTH_EM = 0.6;
+
+function clamp(n, min, max) {
+  return Math.max(min, Math.min(max, n));
+}
+
+/**
+ * Compute a font size that keeps the label on one line inside the blob.
+ * - Fits ~90% of available width (some breathing room)
+ * - Clamps so short labels don't look huge and tiny blobs don't make text unreadable
+ */
+function adaptiveLabelFontSize(label, boxWidthPx, {
+  fitRatio = 0.9,      // how much of the width we allow the text to occupy
+  minPx = 14,          // minimum readable size
+  maxPx = 50           // hard cap to keep things tasteful
+} = {}) {
+  const len = Math.max(label.trim().length, 1);
+  // Solve: fontSize * len * CHAR_WIDTH_EM <= fitRatio * boxWidth
+  const sizeByFit = (fitRatio * boxWidthPx) / (len * CHAR_WIDTH_EM);
+
+  // Also cap by a width-based baseline so very wide blobs still limit font
+  const widthBaseline = boxWidthPx / 8.5; // tune this divisor to taste
+
+  return clamp(Math.min(sizeByFit, widthBaseline), minPx, maxPx);
+}
 
 const PX_RATIO = typeof window !== "undefined" ? window.devicePixelRatio : 1;
 
@@ -231,6 +314,14 @@ class CanvAscii {
       overlayFontFamily,
       fitToView,
       fitPadding,
+      fitMode,
+      keepHeight,
+      squishLimit,
+      stretchX,
+      stretchLimit,
+      minPlaneWidth,
+      forceAspectRatio,
+      styleMode,
     },
     containerElem,
     width,
@@ -251,6 +342,14 @@ class CanvAscii {
     this.overlayFontFamily = overlayFontFamily;
     this.fitToView = fitToView;
     this.fitPadding = fitPadding ?? 0.8;
+    this.fitMode = fitMode || 'contain'; // 'contain' | 'cover' | 'width' | 'height'
+    this.keepHeight = !!keepHeight;
+    this.squishLimit = typeof squishLimit === 'number' ? squishLimit : 0.9; // min allowed X relative to Y
+    this.stretchX = !!stretchX;
+    this.stretchLimit = typeof stretchLimit === 'number' ? stretchLimit : 1.6; // max X relative to Y
+    this.minPlaneWidth = minPlaneWidth;
+    this.forceAspectRatio = forceAspectRatio; // force plane to specific width:height ratio
+    this.styleMode = styleMode ?? 'subtle'; // 'subtle' or 'creative'
 
     this.mouse = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
 
@@ -281,9 +380,52 @@ class CanvAscii {
 
     const sH = (visibleH * this.fitPadding) / planeH;
     const sW = (visibleW * this.fitPadding) / planeW;
-    const scale = this.fitToView ? Math.min(sH, sW) : 1;
 
-    this.mesh.scale.set(scale, scale, 1);
+    let scale;
+    if (!this.fitToView) {
+      scale = 1;
+    } else {
+      switch (this.fitMode) {
+        case 'cover':
+          scale = Math.max(sH, sW);
+          break;
+        case 'width':
+          scale = sW;
+          break;
+        case 'height':
+          scale = sH;
+          break;
+        case 'contain':
+        default:
+          scale = Math.min(sH, sW);
+      }
+    }
+
+    if (this.keepHeight && this.fitMode === 'height') {
+      const targetY = sH;
+      let scaleX = sH;
+      let scaleY = sH;
+      if (sW < sH) {
+        const minAllowedX = this.squishLimit * sH;
+        if (sW >= minAllowedX) {
+          // allow mild squeeze within limit
+          scaleX = sW;
+          scaleY = targetY;
+        } else {
+          // width too small; preserve aspect by uniformly downscaling
+          scaleX = sW;
+          scaleY = sW;
+        }
+      } else if (sW > sH && this.stretchX) {
+        // allow horizontal stretch (up to a limit) so short titles can fill width
+        const maxAllowedX = this.stretchLimit * sH;
+        scaleX = Math.min(sW, maxAllowedX);
+        scaleY = targetY;
+      }
+      this.mesh.scale.set(scaleX, scaleY, 1);
+    } else {
+      this.mesh.scale.set(scale, scale, 1);
+    }
   }
 
 
@@ -301,11 +443,37 @@ class CanvAscii {
 
     const textAspect = this.textCanvas.width / this.textCanvas.height;
     const baseH = this.planeBaseHeight;
-    const planeW = baseH * textAspect;
+    const naturalPlaneW = baseH * textAspect;
+    let planeW = naturalPlaneW;
+    
+    // If forceAspectRatio is set, use it to determine plane width
+    let needsUVAdjustment = false;
+    if (this.forceAspectRatio) {
+      planeW = baseH * this.forceAspectRatio;
+      needsUVAdjustment = true;
+    } else if (this.minPlaneWidth && planeW < this.minPlaneWidth) {
+      // Fallback to minPlaneWidth if no forceAspectRatio
+      planeW = this.minPlaneWidth;
+      needsUVAdjustment = true;
+    }
+    
     const planeH = baseH;
 
     // Increase geometry segments for better wave deformation
     this.geometry = new THREE.PlaneGeometry(planeW, planeH, 64, 64);
+    
+    // Adjust UVs to center the texture on the plane if needed
+    if (needsUVAdjustment) {
+      const uvScaleX = naturalPlaneW / planeW;
+      const uvOffsetX = (1 - uvScaleX) / 2;
+      
+      const uvAttribute = this.geometry.attributes.uv;
+      for (let i = 0; i < uvAttribute.count; i++) {
+        const u = uvAttribute.getX(i);
+        uvAttribute.setX(i, u * uvScaleX + uvOffsetX);
+      }
+    }
+    
     this.material = new THREE.ShaderMaterial({
       vertexShader,
       fragmentShader,
@@ -317,17 +485,19 @@ class CanvAscii {
         uTexture: { value: this.texture },
         uEnableWaves: { value: this.enableWaves ? 1.0 : 0.0 },
         uResolution: { value: new THREE.Vector2(this.width, this.height) },
+        uStyleMode: { value: this.styleMode === 'creative' ? 1.0 : 0.0 },
       },
     });
 
     this.mesh = new THREE.Mesh(this.geometry, this.material);
+    this.mesh.position.set(0, 0, 0);
     this.scene.add(this.mesh);
     this.fitMeshToView();
   }
 
   setRenderer() {
     this.renderer = new THREE.WebGLRenderer({ antialias: false, alpha: true });
-    this.renderer.setPixelRatio(1);
+    this.renderer.setPixelRatio(PX_RATIO);
     this.renderer.setClearColor(0x000000, 0);
     this.renderer.setViewport(0, 0, this.width, this.height);
 
@@ -365,6 +535,7 @@ class CanvAscii {
     this.renderer.setViewport(0, 0, w, h);
 
     this.center = { x: w / 2, y: h / 2 };
+    this.fitMeshToView();
   }
 
   load() {
@@ -472,9 +643,17 @@ export default function ASCIIText({
   followMouse = true,
   rotationLimit = 0.2,
   fontFamily = DEFAULT_FONT_STACK,
-  overlayFontFamily,
+  overlayFontFamily = DEFAULT_FONT_STACK,
   fitToView = true,
   fitPadding = 0.8,
+  fitMode = 'contain',
+  keepHeight = false,
+  squishLimit = 0.9,
+  stretchX = false,
+  stretchLimit = 1.6,
+  minPlaneWidth,
+  forceAspectRatio,
+  styleMode = 'subtle', // 'subtle' or 'creative'
 }) {
   const containerRef = useRef(null);
   const asciiInstance = useRef(null);
@@ -490,7 +669,7 @@ export default function ASCIIText({
           {
             text, asciiFontSize, textFontSize, textColor, planeBaseHeight,
             enableWaves, followMouse, rotationLimit, fontFamily,
-            overlayFontFamily: overlayFontFamily ?? fontFamily, fitToView, fitPadding
+            overlayFontFamily: overlayFontFamily ?? fontFamily, fitToView, fitPadding, fitMode, keepHeight, squishLimit, stretchX, stretchLimit, minPlaneWidth, forceAspectRatio, styleMode
           },
           container,
           width,
@@ -513,7 +692,7 @@ export default function ASCIIText({
       ro.disconnect();
       asciiInstance.current?.dispose();
     };
-  }, [text, asciiFontSize, textFontSize, textColor, planeBaseHeight, enableWaves, followMouse, rotationLimit, fontFamily, overlayFontFamily]);
+  }, [text, asciiFontSize, textFontSize, textColor, planeBaseHeight, enableWaves, followMouse, rotationLimit, fontFamily, overlayFontFamily, styleMode]);
 
   return (
     <div

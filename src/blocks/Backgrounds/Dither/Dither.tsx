@@ -1,16 +1,13 @@
-
-
 /* eslint-disable react/no-unknown-property */
 import { useRef, useState, useEffect } from "react";
-import { Canvas, useFrame, useThree, ThreeEvent } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { EffectComposer, wrapEffect } from "@react-three/postprocessing";
 import { Effect } from "postprocessing";
 import * as THREE from "three";
-import { Mesh, MathUtils } from 'three'
+import { Mesh } from 'three'; // Removed MathUtils as it wasn't used
 
 import "./Dither.css";
 const MAX_BLOBS = 20;
-
 
 
 const waveVertexShader = `
@@ -27,7 +24,8 @@ const waveFragmentShader = `
 precision highp float;
 
 // — standard uniforms —
-uniform int   uBlobsActive;
+uniform int   uBlobsActive; // Now indicates if blobs *should* be active (growing or fully grown)
+uniform bool  uIsFadingOut; // New uniform to indicate fade-out state
 uniform vec2  resolution;
 uniform float time;
 uniform float waveSpeed;
@@ -41,9 +39,11 @@ uniform float mouseRadius;
 
 // — blob mask uniforms —
 uniform int   numBlobs;
-uniform vec4  blobs[20];
+uniform vec4  blobs[${MAX_BLOBS}]; // Use constant
 uniform float uGrowDuration;
 uniform float uStartTime;
+uniform float uFadeDuration; // New uniform
+uniform float uFadeStartTime; // New uniform
 
 vec4 mod289(vec4 x){ return x - floor(x*(1.0/289.0))*289.0; }
 vec4 permute(vec4 x){ return mod289(((x*34.0)+1.0)*x); }
@@ -95,62 +95,78 @@ float pattern(vec2 p){
 void main(){
   vec2 uv = gl_FragCoord.xy / resolution.xy;
   uv -= 0.5;
-  
-  // This line consistently ties the pattern's scale to the viewport width.
-  uv.y *= resolution.y / resolution.x;
+
+  uv.y *= resolution.y / resolution.x; // Aspect ratio correction
 
   float mask = 0.0;
-  if(uBlobsActive == 1){
+  // Blobs are only processed if they are active OR fading out
+  if(uBlobsActive == 1 || uIsFadingOut){
     float edge = 0.05;
-    float grow = clamp((time - uStartTime) / uGrowDuration, 0.0, 1.0);
+    float effectProgress = 0.0;
+    float currentEffectTime = 0.0;
+    float sizeFactor = 0.0; // Factor to multiply radius by (0 to 1)
 
-    for(int i = 0; i < numBlobs; ++i) {
-      vec4 B = blobs[i];
-      float rx = max(B.z * grow, 1e-4);
-      float ry = max(B.w * grow, 1e-4);
+    if (uIsFadingOut) {
+        currentEffectTime = time - uFadeStartTime;
+        effectProgress = clamp(currentEffectTime / uFadeDuration, 0.0, 1.0);
+        sizeFactor = 1.0 - effectProgress; // Shrink from 1 to 0
+    } else { // Growing in or fully grown
+        currentEffectTime = time - uStartTime;
+        effectProgress = clamp(currentEffectTime / uGrowDuration, 0.0, 1.0);
+        sizeFactor = effectProgress; // Grow from 0 to 1
+    }
 
-      vec2 dpos = uv - B.xy;
-      float d = length(vec2(dpos.x / rx, dpos.y / ry));
+    // Only render if sizeFactor is > 0 (visible)
+    if (sizeFactor > 0.0) {
+        for(int i = 0; i < numBlobs; ++i) {
+            // Check bounds for safety, although numBlobs should be correct
+             if (i >= ${MAX_BLOBS}) break;
 
-      // quick reject if we’re well outside the noisy band
-      if (d > 1.0 + waveAmplitude + edge) continue;
+            vec4 B = blobs[i];
+            // Apply sizeFactor to radii
+            float rx = max(B.z * sizeFactor, 1e-4);
+            float ry = max(B.w * sizeFactor, 1e-4);
 
-      // only now do the noise
-      float rnd = fract(sin(float(i)*12.9898)*43758.5453);
-      float w = pattern(dpos * waveFrequency + (time + rnd*10.0)*waveSpeed)
-              * waveAmplitude;
+            vec2 dpos = uv - B.xy;
+            float d = length(vec2(dpos.x / rx, dpos.y / ry));
 
-      float thresh = 1.0 + w;
-      float m = 1.0 - smoothstep(thresh - edge, thresh + edge, d);
-      mask = max(mask, m);
+            // quick reject
+            if (d > 1.0 + waveAmplitude + edge) continue;
+
+            // noise calculation
+            float rnd = fract(sin(float(i)*12.9898)*43758.5453);
+            float w = pattern(dpos * waveFrequency + (time + rnd*10.0)*waveSpeed) * waveAmplitude;
+
+            float thresh = 1.0 + w;
+            float m = 1.0 - smoothstep(thresh - edge, thresh + edge, d);
+            mask = max(mask, m);
+        }
     }
   }
+
 
   float f = pattern(uv);
   if(enableMouseInteraction==1){
     vec2 m = (mousePos/resolution - 0.5)*vec2(1.0,-1.0);
-    // Apply the same logic to the mouse coordinates for consistency.
-    m.y *= resolution.y / resolution.x;
+    m.y *= resolution.y / resolution.x; // Aspect ratio correction for mouse
     float dist = length(uv-m);
     f -= 0.5*(1.0 - smoothstep(0.0, mouseRadius, dist));
   }
+
   vec3 col = mix(vec3(0.0), waveColor, f);
+  // Apply mask regardless of whether it was calculated this frame
   col = mix(col, vec3(0.0), mask);
 
   gl_FragColor = vec4(col,1.0);
 }
 `;
 
-
-
-
-
-
-
 const ditherFragmentShader = `
 precision highp float;
 uniform float colorNum;
 uniform float pixelSize;
+uniform vec2 resolution; // Need resolution here too
+
 const float bayerMatrix8x8[64] = float[64](
   0.0/64.0, 48.0/64.0, 12.0/64.0, 60.0/64.0,  3.0/64.0, 51.0/64.0, 15.0/64.0, 63.0/64.0,
   32.0/64.0,16.0/64.0, 44.0/64.0, 28.0/64.0, 35.0/64.0,19.0/64.0, 47.0/64.0, 31.0/64.0,
@@ -163,23 +179,30 @@ const float bayerMatrix8x8[64] = float[64](
 );
 
 vec3 dither(vec2 uv, vec3 color) {
-  vec2 scaledCoord = floor(uv * resolution / pixelSize);
-  int x = int(mod(scaledCoord.x, 8.0));
-  int y = int(mod(scaledCoord.y, 8.0));
-  float threshold = bayerMatrix8x8[y * 8 + x] - 0.25;
-  float step = 1.0 / (colorNum - 1.0);
+  // Use gl_FragCoord directly for screen-space dithering
+  vec2 screenCoord = gl_FragCoord.xy;
+  int x = int(mod(screenCoord.x / pixelSize, 8.0));
+  int y = int(mod(screenCoord.y / pixelSize, 8.0));
+
+  float threshold = bayerMatrix8x8[y * 8 + x] - 0.5; // Adjusted threshold center
+  float step = 1.0 / (colorNum); // Adjusted step for quantization levels
+
   color += threshold * step;
-  float bias = 0.2;
-  color = clamp(color - bias, 0.0, 1.0);
-  return floor(color * (colorNum - 1.0) + 0.5) / (colorNum - 1.0);
+  color = clamp(color, 0.0, 1.0); // Clamp before quantization
+
+  // Quantize to colorNum levels
+  return floor(color * colorNum + 0.5) / colorNum;
 }
 
+
 void mainImage(in vec4 inputColor, in vec2 uv, out vec4 outputColor) {
-  vec2 normalizedPixelSize = pixelSize / resolution;
-  vec2 uvPixel = normalizedPixelSize * floor(uv / normalizedPixelSize);
-  vec4 color = texture2D(inputBuffer, uvPixel);
-  color.rgb = dither(uv, color.rgb);
-  outputColor = color;
+    // Read the color from the input buffer (previous pass)
+    vec4 color = texture2D(inputBuffer, uv);
+
+    // Apply dithering
+    color.rgb = dither(uv, color.rgb);
+
+    outputColor = color;
 }
 `;
 
@@ -189,6 +212,7 @@ class RetroEffectImpl extends Effect {
     const uniforms = new Map<string, THREE.Uniform<any>>([
       ["colorNum", new THREE.Uniform(4.0)],
       ["pixelSize", new THREE.Uniform(2.0)],
+      ["resolution", new THREE.Uniform(new THREE.Vector2(1, 1))], // Add resolution uniform
     ]);
     super("RetroEffect", ditherFragmentShader, { uniforms });
     this.uniforms = uniforms;
@@ -205,6 +229,13 @@ class RetroEffectImpl extends Effect {
   get pixelSize(): number {
     return this.uniforms.get("pixelSize")!.value;
   }
+  // Add setter/getter for resolution
+  set resolution(value: THREE.Vector2) {
+    this.uniforms.get("resolution")!.value = value;
+  }
+  get resolution(): THREE.Vector2 {
+    return this.uniforms.get("resolution")!.value;
+  }
 }
 
 import { forwardRef } from "react";
@@ -213,10 +244,32 @@ const RetroEffect = forwardRef<
   RetroEffectImpl,
   { colorNum: number; pixelSize: number }
 >((props, ref) => {
+  const { size } = useThree(); // Get viewport size
   const { colorNum, pixelSize } = props;
+  const effect = useRef<RetroEffectImpl>();
+
+  // Update resolution uniform when size changes
+  useEffect(() => {
+    if (effect.current) {
+        // No need to multiply by DPR here as gl_FragCoord is already in pixel coordinates
+      effect.current.resolution.set(size.width, size.height);
+    }
+  }, [size]);
+
   const WrappedRetroEffect = wrapEffect(RetroEffectImpl);
   return (
-    <WrappedRetroEffect ref={ref} colorNum={colorNum} pixelSize={pixelSize} />
+    <WrappedRetroEffect
+      ref={(instance) => {
+        effect.current = instance as RetroEffectImpl | undefined; // Store ref
+        if (typeof ref === 'function') {
+          ref(instance);
+        } else if (ref) {
+          ref.current = instance;
+        }
+      }}
+      colorNum={colorNum}
+      pixelSize={pixelSize}
+    />
   );
 });
 
@@ -233,13 +286,18 @@ function DitheredWaves({
   disableAnimation,
   enableMouseInteraction,
   mouseRadius,
-  blobsActive = false,
+  blobsActive = false, // Prop indicating if blobs *should* be active
   blobs,
+  growDuration = 1.0,  // Make durations props
+  fadeDuration = 1.0   // Make durations props
 }) {
-  const mesh = useRef<Mesh | null>(null)
+  const mesh = useRef<Mesh | null>(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const { viewport, size, gl } = useThree();
   const startTimeRef = useRef(0);
+  const fadeStartTimeRef = useRef(0); // Ref for fade start time
+  const wasActiveRef = useRef(blobsActive); // Track previous active state
+  const isFadingOutRef = useRef(false); // Track if currently fading out
 
   useEffect(() => {
     if (mesh.current) {
@@ -248,7 +306,7 @@ function DitheredWaves({
   }, [viewport.width, viewport.height]);
 
 
-
+  // Initialize uniforms including new ones
   const waveUniformsRef = useRef({
     time: new THREE.Uniform(0),
     resolution: new THREE.Uniform(new THREE.Vector2(0, 0)),
@@ -257,26 +315,30 @@ function DitheredWaves({
     waveAmplitude: new THREE.Uniform(waveAmplitude),
     waveColor: new THREE.Uniform(new THREE.Color(...waveColor)),
     mousePos: new THREE.Uniform(new THREE.Vector2(0, 0)),
-    uBlobsActive: new THREE.Uniform(0),
+    uBlobsActive: new THREE.Uniform(blobsActive ? 1 : 0), // Use initial prop value
+    uIsFadingOut: new THREE.Uniform(false), // Initialize fading state
     uOctaves: new THREE.Uniform(8),
     enableMouseInteraction: new THREE.Uniform(enableMouseInteraction ? 1 : 0),
     mouseRadius: new THREE.Uniform(mouseRadius),
-    uGrowDuration: new THREE.Uniform(2.0),
+    uGrowDuration: new THREE.Uniform(growDuration),
     uStartTime: new THREE.Uniform(0),
+    uFadeDuration: new THREE.Uniform(fadeDuration), // Add fade duration uniform
+    uFadeStartTime: new THREE.Uniform(0), // Add fade start time uniform
     blobs: {
       value: Array.from({ length: MAX_BLOBS }, () => new THREE.Vector4(0, 0, 0, 0))
     },
     numBlobs: { value: 0 },
   });
 
+  // Update blob data when blobs prop changes
   useEffect(() => {
     if (!waveUniformsRef.current) return;
-
-    waveUniformsRef.current.numBlobs.value = blobs.length;
+    const numBlobsToUse = Math.min(blobs.length, MAX_BLOBS);
+    waveUniformsRef.current.numBlobs.value = numBlobsToUse;
     const uniformBlobArray = waveUniformsRef.current.blobs.value;
 
     for (let i = 0; i < MAX_BLOBS; i++) {
-      if (i < blobs.length) {
+      if (i < numBlobsToUse) {
         uniformBlobArray[i].set(
           blobs[i].cx,
           blobs[i].cy,
@@ -284,13 +346,14 @@ function DitheredWaves({
           blobs[i].ry
         );
       } else {
+        // Zero out unused blob slots
         uniformBlobArray[i].set(0, 0, 0, 0);
       }
     }
   }, [blobs]);
 
 
-
+  // Update resolution when size or pixel ratio changes
   useEffect(() => {
     const dpr = gl.getPixelRatio();
     const newWidth = Math.floor(size.width * dpr);
@@ -302,42 +365,81 @@ function DitheredWaves({
     }
   }, [size, gl]);
 
+  // Frame loop for updating time and animation state
   useFrame(({ clock }) => {
-
-     const elapsedTime = clock.getElapsedTime();
+    const uniforms = waveUniformsRef.current;
+    const elapsedTime = clock.getElapsedTime();
 
     if (!disableAnimation) {
-      waveUniformsRef.current.time.value = elapsedTime;
+      uniforms.time.value = elapsedTime;
+    }
+
+    // --- State Management for Grow/Fade ---
+    const shouldBeActive = blobsActive;
+    const wasActive = wasActiveRef.current;
+
+    // Start Grow: Was inactive, now should be active
+    if (!wasActive && shouldBeActive && startTimeRef.current === 0) {
+        startTimeRef.current = elapsedTime;
+        fadeStartTimeRef.current = 0; // Reset fade timer
+        isFadingOutRef.current = false;
+        uniforms.uStartTime.value = startTimeRef.current;
+        uniforms.uFadeStartTime.value = 0;
+        uniforms.uIsFadingOut.value = false;
+        uniforms.uBlobsActive.value = 1; // Mark as active (growing or grown)
+    }
+    // Start Fade: Was active, now should be inactive
+    else if (wasActive && !shouldBeActive && fadeStartTimeRef.current === 0) {
+        fadeStartTimeRef.current = elapsedTime;
+        startTimeRef.current = 0; // Reset grow timer
+        isFadingOutRef.current = true;
+        uniforms.uFadeStartTime.value = fadeStartTimeRef.current;
+        uniforms.uStartTime.value = 0;
+        uniforms.uIsFadingOut.value = true;
+        uniforms.uBlobsActive.value = 0; // Mark as inactive (fading or gone)
+    }
+
+    // Check if fade is complete
+    if (isFadingOutRef.current) {
+        const fadeProgress = (elapsedTime - fadeStartTimeRef.current) / uniforms.uFadeDuration.value;
+        if (fadeProgress >= 1.0) {
+            isFadingOutRef.current = false; // Stop fading state
+            fadeStartTimeRef.current = 0;   // Reset timer
+            uniforms.uIsFadingOut.value = false; // Update shader
+        }
+    }
+     // Check if grow is complete (optional, could be useful)
+    if (!isFadingOutRef.current && startTimeRef.current !== 0) {
+        const growProgress = (elapsedTime - startTimeRef.current) / uniforms.uGrowDuration.value;
+        // if (growProgress >= 1.0) { // Blob is fully grown }
     }
 
 
-     if (blobsActive && startTimeRef.current === 0) {
-    startTimeRef.current = elapsedTime;
-  } else if (!blobsActive) {
-    startTimeRef.current = 0;
-  }
+    // Update previous state for next frame
+    wasActiveRef.current = shouldBeActive;
+    // ------------------------------------
+
+    // Update standard uniforms continuously
+    uniforms.waveSpeed.value = waveSpeed;
+    uniforms.waveFrequency.value = waveFrequency;
+    uniforms.waveAmplitude.value = waveAmplitude;
+    uniforms.waveColor.value.set(...waveColor);
+    uniforms.enableMouseInteraction.value = enableMouseInteraction ? 1 : 0;
+    uniforms.mouseRadius.value = mouseRadius;
+    uniforms.uGrowDuration.value = growDuration; // Update in case prop changes
+    uniforms.uFadeDuration.value = fadeDuration; // Update in case prop changes
 
 
-    waveUniformsRef.current.waveSpeed.value = waveSpeed;
-    waveUniformsRef.current.waveFrequency.value = waveFrequency;
-    waveUniformsRef.current.waveAmplitude.value = waveAmplitude;
-    waveUniformsRef.current.waveColor.value.set(...waveColor);
-    waveUniformsRef.current.enableMouseInteraction.value =
-      enableMouseInteraction ? 1 : 0;
-
-    waveUniformsRef.current.uBlobsActive.value = blobsActive ? 1 : 0;
-    waveUniformsRef.current.mouseRadius.value = mouseRadius;
-    waveUniformsRef.current.uGrowDuration.value = 1;
-    waveUniformsRef.current.uStartTime.value = startTimeRef.current;
     if (enableMouseInteraction) {
-      waveUniformsRef.current.mousePos.value.set(mousePos.x, mousePos.y);
+      uniforms.mousePos.value.set(mousePos.x, mousePos.y);
     }
   });
 
-  const handlePointerMove = (e) => {
+  const handlePointerMove = (e: ThreeEvent<PointerEvent>) => {
     if (!enableMouseInteraction) return;
     const rect = gl.domElement.getBoundingClientRect();
     const dpr = gl.getPixelRatio();
+    // Calculate coordinates relative to canvas, adjusted for DPR
     const x = (e.clientX - rect.left) * dpr;
     const y = (e.clientY - rect.top) * dpr;
     setMousePos({ x, y });
@@ -356,14 +458,15 @@ function DitheredWaves({
       <EffectComposer>
         <RetroEffect colorNum={colorNum} pixelSize={pixelSize} />
       </EffectComposer>
+      {/* Interaction plane */}
       <mesh
         onPointerMove={handlePointerMove}
-        position={[0, 0, 0.01]}
+        position={[0, 0, 0.01]} // Slightly in front
         scale={[viewport.width, viewport.height, 1]}
-        visible={false}
+        visible={false} // Make it invisible
       >
         <planeGeometry args={[1, 1]} />
-        <meshBasicMaterial transparent opacity={0} />
+        <meshBasicMaterial transparent opacity={0} side={THREE.DoubleSide} />
       </mesh>
     </>
   );
@@ -374,7 +477,7 @@ interface BlobConfig {
   cy: number;
   rx: number;
   ry: number;
-  label: string;
+  label: string; // Keep label if needed elsewhere, shader doesn't use it
 }
 
 interface DitherProps {
@@ -389,6 +492,8 @@ interface DitherProps {
   mouseRadius?: number;
   blobsActive?: boolean;
   blobs?: BlobConfig[];
+  growDuration?: number; // Add prop
+  fadeDuration?: number; // Add prop
 }
 
 export default function Dither({
@@ -400,16 +505,21 @@ export default function Dither({
   pixelSize = 2,
   disableAnimation = false,
   enableMouseInteraction = true,
-  mouseRadius = 1,
+  mouseRadius = 0.15, // Adjusted default mouse radius
   blobsActive = false,
-  blobs = []
+  blobs = [],
+  growDuration = 1.0, // Default grow duration
+  fadeDuration = 0.5  // Default fade duration (faster fade)
 }: DitherProps) {
   return (
     <Canvas
       className="dither-container absolute inset-0 w-full h-full"
-      camera={{ position: [0, 0, 6] }}
-      dpr={window.devicePixelRatio}
-      gl={{ antialias: true, preserveDrawingBuffer: true }}
+      camera={{ position: [0, 0, 6], fov: 50 }} // Adjusted camera FOV slightly
+      // Consider setting flat: true if color space conversion isn't needed
+      // gl={{ antialias: false, preserveDrawingBuffer: false, flat: true }}
+      gl={{ antialias: true }} // Keep AA for smoother waves, remove preserveDrawingBuffer unless needed
+      dpr={Math.max(window.devicePixelRatio, 1)} // Clamp DPR for performance
+      // frameloop="demand" // Only render when needed - might break continuous animations
     >
       <DitheredWaves
         waveSpeed={waveSpeed}
@@ -423,6 +533,8 @@ export default function Dither({
         mouseRadius={mouseRadius}
         blobsActive={blobsActive}
         blobs={blobs}
+        growDuration={growDuration}
+        fadeDuration={fadeDuration}
       />
     </Canvas>
   );
