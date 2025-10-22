@@ -14,7 +14,7 @@ interface MainMenuProps {
 const previewContent: Record<string, { title: string; items: string[]; links?: { text: string; url: string }[] }> = {
   ABOUT: {
     title: "         Alperen Aydin         ",
-    items: ["B.S. Computer Science | UT Austin — May 2028","Austin, TX","alperenaydin1@gmail.com"],
+    items: ["B.S. Computer Science | UT Austin — May 2028", "Austin, TX", "alperenaydin1@gmail.com"],
     links: [
       { text: "GitHub", url: "https://github.com/WutIsHummus" },
       { text: "LinkedIn", url: "https://linkedin.com/in/alperenaydin1" },
@@ -23,34 +23,34 @@ const previewContent: Record<string, { title: string; items: string[]; links?: {
   EXPERIENCE: {
     title: "        Experience        ",
     items: [
-      "**Lockheed Martin**","Fullstack Enterprise Ops Intern","May 2023 - May 2024","",
-      "**Longhorn Racing Solar**","Vehicle Controls & Telemetry Developer","Sep 2025 - Present","",
-      "**Stealth Coach**","Owner / Lead Developer","Feb 2025 - Present","",
-      "**Roblox SPTS Studio**","Lead Programming Dev / Co-Owner","Sep 2021 - Present","",
-      "**FTC Robotics**","Captain - Lead Programmer/Designer","Aug 2021 - Aug 2025","",
+      "**Lockheed Martin**", "Fullstack Enterprise Ops Intern", "May 2023 - May 2024", "",
+      "**Longhorn Racing Solar**", "Vehicle Controls & Telemetry Developer", "Sep 2025 - Present", "",
+      "**Stealth Coach**", "Owner / Lead Developer", "Feb 2025 - Present", "",
+      "**Roblox SPTS Studio**", "Lead Programming Dev / Co-Owner", "Sep 2021 - Present", "",
+      "**FTC Robotics**", "Captain - Lead Programmer/Designer", "Aug 2021 - Aug 2025", "",
     ],
   },
   PROJECTS: {
-    title:"         Projects         ",
+    title: "         Projects         ",
     items: [
-      "**LHR Photon Vulkan Renderer**","C++ GPU-accelerated 3D telemetry visualization engine","Custom rendering pipeline, PBR materials, Vulkan API","",
-      "**Stealth Coach**","AI-powered productivity tool (.NET + Next.js)","Machine learning integration, user analytics","",
-      "**Super Power Training Simulator**","1M+ visits, 10K+ active community","LUA Programming, game mechanics & framework","Client & server optimization","",
-      "**Lockheed Martin Code/CyberQuest**","React TS Registration Pages, FusionAuth SAML SSO","S3 + Hasura DB sync","",
-      "**7tv2Discord**","Emote browser with real-time updates","React, Node.js, WebSocket","",
-      "**The Cosmobots Robotics**","Ranked 26/8,000 (Top 0.3%)","Motion profiling + Kalman filter (Java)","Custom command framework","",
+      "**LHR Photon Vulkan Renderer**", "C++ GPU-accelerated 3D telemetry visualization engine", "Custom rendering pipeline, PBR materials, Vulkan API", "",
+      "**Stealth Coach**", "AI-powered productivity tool (.NET + Next.js)", "Machine learning integration, user analytics", "",
+      "**Super Power Training Simulator**", "1M+ visits, 10K+ active community", "LUA Programming, game mechanics & framework", "Client & server optimization", "",
+      "**Lockheed Martin Code/CyberQuest**", "React TS Registration Pages, FusionAuth SAML SSO", "S3 + Hasura DB sync", "",
+      "**7tv2Discord**", "Emote browser with real-time updates", "React, Node.js, WebSocket", "",
+      "**The Cosmobots Robotics**", "Ranked 26/8,000 (Top 0.3%)", "Motion profiling + Kalman filter (Java)", "Custom command framework", "",
     ],
   },
   "TECH STACK": {
     title: "          Skills          ",
     items: [
-      "**Programming Languages:**","Java, C++, Python, JS/TS, C#, Lua, SQL","",
-      "**Frontend:**","React, Next.js, Vue, Tailwind, WebGL/Three.js, Canvas API","",
-      "**Backend/APIs:**","Node, Express, .NET Core, REST/GraphQL/WebSocket","",
-      "**Databases/Storage:**","PostgreSQL, MySQL, MongoDB, Redis, AWS S3","",
-      "**Cloud/DevOps:**","AWS, Docker, Cloudflare, Vercel","",
-      "**Graphics/Game Dev:**","Vulkan, OpenGL, GLTF, Roblox, Unreal, Shaders, Ray Tracing","",
-      "**Tools:**","Git, CMake, Confluence, VS Code, Stripe, Firebase, Hasura, Vite, Android Studio",
+      "**Programming Languages:**", "Java, C++, Python, JS/TS, C#, Lua, SQL", "",
+      "**Frontend:**", "React, Next.js, Vue, Tailwind, WebGL/Three.js, Canvas API", "",
+      "**Backend/APIs:**", "Node, Express, .NET Core, REST/GraphQL/WebSocket", "",
+      "**Databases/Storage:**", "PostgreSQL, MySQL, MongoDB, Redis, AWS S3", "",
+      "**Cloud/DevOps:**", "AWS, Docker, Cloudflare, Vercel", "",
+      "**Graphics/Game Dev:**", "Vulkan, OpenGL, GLTF, Roblox, Unreal, Shaders, Ray Tracing", "",
+      "**Tools:**", "Git, CMake, Confluence, VS Code, Stripe, Firebase, Hasura, Vite, Android Studio",
     ],
   },
 };
@@ -64,6 +64,7 @@ const MainMenu: React.FC<MainMenuProps> = memo(({ isVisible, onTransitionEnd, me
   // Layout
   const [blobs, setBlobs] = useState<PositionedBlob[]>([]);
   const [selectedSection, setSelectedSection] = useState<string | null>("ABOUT");
+  const [showPDF, setShowPDF] = useState(false);
 
   // Refs
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -186,7 +187,7 @@ const MainMenu: React.FC<MainMenuProps> = memo(({ isVisible, onTransitionEnd, me
                     <div
                       key={selectedSection}
                       className="space-y-4"
-                      style={{ 
+                      style={{
                         animation: "fadeInUp 0.4s cubic-bezier(0.4,0,0.2,1) forwards",
                         maxWidth: "min(90%, 800px)",
                         width: "100%"
