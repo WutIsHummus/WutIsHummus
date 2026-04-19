@@ -30,7 +30,7 @@ Custom C++ embedded application on Raspberry Pi bridging the solar car's CAN-bus
 > `C++` &middot; `Raspberry Pi` &middot; `CAN-bus` &middot; `Vulkan` &middot; `UDP/TCP`
 
 ### [YoctoPiBuild](https://github.com/lhr-solar/YoctoPiBuild) &middot; *Longhorn Racing Solar*
-Yocto Linux build configuration for the Raspberry Pi CM4 that underpins the Photon telemetry stack. Reproducible, minimal, bootable images tuned for the solar car's embedded environment.
+Yocto Linux build configuration for a custom integrated Raspberry Pi CM5 that underpins the Photon telemetry stack. Reproducible, minimal, bootable images tuned for the solar car's embedded environment.
 
 > `Yocto` &middot; `Linux` &middot; `Raspberry Pi CM4` &middot; `Embedded`
 
