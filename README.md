@@ -1,6 +1,7 @@
 # Hi, I'm Alperen
 
-CS @ **The University of Texas at Austin** (B.S. '28). Building systems that span **embedded firmware, AI tooling, and live multiplayer games**.
+CS @ **The University of Texas at Austin** (B.S. '28). \
+Building systems that span **embedded firmware, AI tooling, and live multiplayer games**.
 
  
 **Location:** Austin, TX <br>
@@ -65,7 +66,3 @@ Fullstack Next.js / TypeScript / React web app that integrates with the Discord 
 Camci, A., & Aydin, A. (2023). *Advantages of AI for healthcare in developing countries.* Proceedings of London International Conferences, (8), 82 to 88. [doi.org/10.31039/plic.2023.8.171](https://doi.org/10.31039/plic.2023.8.171)
 
 ---
-
-## Reach me
-
-[LinkedIn](https://linkedin.com) &middot; `alperenaydin1@gmail.com`
