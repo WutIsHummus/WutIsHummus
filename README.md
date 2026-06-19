@@ -10,12 +10,6 @@ Building systems that span **embedded firmware, AI tooling, and live multiplayer
 **Contact:** alperenaydin1@gmail.com
  
 ---
-## What I'm into
-- **Embedded & systems**: C++ on Raspberry Pi, CAN-bus, Vulkan, cross-platform telemetry
-- **AI-assisted developer tooling**: agent orchestration, LLM context packets, MCP servers, local inference with Ollama
-- **Game development**: server-authoritative Roblox architecture, anti-exploit, client prediction, live-ops
-- **Fullstack when needed**: Next.js / TypeScript / React / Node.js / PostgreSQL
----
 ## Featured Github Projects
 ### [Photon](https://github.com/lhr-solar/Photon) &middot; *Longhorn Racing Solar*
 Custom C++ embedded application on Raspberry Pi bridging the solar car's CAN-bus to a distributed telemetry network. Features a multi-node UDP/TCP comms layer, a Vulkan-accelerated visualization tool with OpenStreetMap and OpenElevation overlays for terrain-aware GPS tracking, and an embedded driver dashboard ingesting CAN signals alongside three synchronized camera feeds.
@@ -32,14 +26,4 @@ Automated internship discovery. Scrapes LinkedIn via Playwright, scores each pos
 ### [7tv2DiscordLocal](https://github.com/WutIsHummus/7tv2DiscordLocal)
 Fullstack Next.js / TypeScript / React web app that integrates with the Discord API to let users browse and bulk-add 7TV emotes to their servers. Open source.
 > `Next.js` &middot; `TypeScript` &middot; `React` &middot; `Discord API`
----
-## Stack
-**Languages**: Java, C/C++, Python, TypeScript, C#, Lua
-**Frameworks**: React, Next.js, Node.js, .NET / WPF, GraphQL
-**Systems**: Raspberry Pi, CAN-bus, UDP/TCP, Vulkan, Yocto Linux
-**Infra & Data**: PostgreSQL, AWS S3, Docker, GitLab CI/CD, Hasura
-**Auth & APIs**: SAML/SSO, FusionAuth, Clerk, Stripe, OpenAI API
----
-## Publications
-Camci, A., & Aydin, A. (2023). *Advantages of AI for healthcare in developing countries.* Proceedings of London International Conferences, (8), 82 to 88. [doi.org/10.31039/plic.2023.8.171](https://doi.org/10.31039/plic.2023.8.171)
 ---
