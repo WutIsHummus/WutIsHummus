@@ -1,5 +1,5 @@
 # Hi, I'm Alperen
-CS @ **The University of Texas at Austin** (B.S. '28). \
+CS @ **The University of Texas at Austin** (B.S. '28). 
  
 **Location:** Austin, TX <br>
 **Current:** Vehicle Controls & Telemetry @ Longhorn Racing Solar <br>
