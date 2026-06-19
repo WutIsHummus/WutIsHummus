@@ -1,6 +1,5 @@
 # Hi, I'm Alperen
 CS @ **The University of Texas at Austin** (B.S. '28). \
-Building systems that span **embedded firmware, AI tooling, and live multiplayer games**.
  
 **Location:** Austin, TX <br>
 **Current:** Vehicle Controls & Telemetry @ Longhorn Racing Solar <br>
